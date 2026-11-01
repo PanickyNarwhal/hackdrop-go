@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "HackDrop",
+  "outputfilename": "hackdrop",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "BlackMesa"
+  },
+  "info": {
+    "companyName": "HackDrop Open Source",
+    "productName": "HackDrop",
+    "productVersion": "0.1.0",
+    "copyright": "MIT",
+    "comments": "FOSS AWDL + Wi-Fi Aware + IPv6 AirDrop Bridge"
+  }
+}

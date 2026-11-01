@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HackDrop</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 32 32" width="24" height="24" fill="none">
+            <circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="2.2" stroke-dasharray="56 18" />
+            <circle cx="16" cy="16" r="8.5" stroke="currentColor" stroke-width="2.2" stroke-dasharray="36 14" />
+            <circle cx="16" cy="16" r="3.5" fill="currentColor" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">HackDrop</div>
+          <div class="brand-sub" id="sidebar-os">AWDL / IPv6 Bridge</div>
+        </div>
+      </div>
+
+      <nav class="nav-list">
+        <button class="nav-btn active" data-tab="receive">
+          <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"></path>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"></path>
+          </svg>
+          <span>Receive</span>
+        </button>
+        <button class="nav-btn" data-tab="send">
+          <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13"></path>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+          </svg>
+          <span>Send</span>
+        </button>
+        <button class="nav-btn" data-tab="radio">
+          <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>AWDL &amp; NAN Stack</span>
+        </button>
+        <button class="nav-btn" data-tab="settings">
+          <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-pill">
+          <span class="pulse-dot"></span>
+          <span id="sidebar-port">HTTPS :8770 Active</span>
+        </div>
+        <div class="device-id-tag" id="sidebar-device-id">ID: ...</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- TAB 1: RECEIVE -->
+      <section class="tab-panel active" id="tab-receive">
+        <div class="receive-center">
+          <div class="radar-container" id="radar-widget">
+            <div class="radar-ring ring-1"></div>
+            <div class="radar-ring ring-2"></div>
+            <div class="radar-ring ring-3"></div>
+            <div class="radar-core">
+              <svg viewBox="0 0 48 48" width="42" height="42" fill="none">
+                <circle cx="24" cy="24" r="20" stroke="#a855f7" stroke-width="3" stroke-dasharray="85 28" />
+                <circle cx="24" cy="24" r="13" stroke="#c084fc" stroke-width="3" stroke-dasharray="54 20" />
+                <circle cx="24" cy="24" r="5" fill="#c084fc" />
+              </svg>
+            </div>
+          </div>
+
+          <h1 class="node-name" id="receive-node-name">Loading...</h1>
+          <div class="node-subtitle">
+            <span class="badge" id="receive-model-badge">PC</span>
+            <span class="badge badge-accent" id="receive-ip-badge">IP: ...</span>
+            <span class="badge badge-accent" id="receive-id-badge">#a4e027</span>
+          </div>
+
+          <!-- Quick Controls Bar -->
+          <div class="quick-controls">
+            <div class="control-group">
+              <label>AirDrop Visibility</label>
+              <div class="segmented" id="visibility-segmented">
+                <button data-vis="Everyone" class="seg-btn active">Everyone</button>
+                <button data-vis="Off" class="seg-btn">Receiving Off</button>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label>Quick Save (Auto-Accept)</label>
+              <button class="toggle-btn" id="auto-accept-btn">Off (Ask Every Time)</button>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="receive-actions">
+            <button class="btn btn-primary" id="btn-ble-pulse">
+              <span>Broadcast BLE 0x4c00 Wakeup Pulse</span>
+            </button>
+            <button class="btn btn-secondary" id="btn-subnet-scan">
+              <span>Scan Local Subnet (:8770 / :8771)</span>
+            </button>
+          </div>
+
+          <!-- Recent Received Transfers -->
+          <div class="card history-card">
+            <div class="card-header">
+              <span>Recent AirDrop Activity &amp; Saved Files</span>
+              <span class="muted" id="download-dir-label">~/Downloads/HackDrop</span>
+            </div>
+            <div id="events-list" class="events-list">
+              <div class="empty-hint">Listening for incoming AirDrop connections on port 8770...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: SEND -->
+      <section class="tab-panel" id="tab-send">
+        <div class="send-grid-layout">
+          <!-- File Selection Card -->
+          <div class="card">
+            <div class="card-header">
+              <span>1. Select Files to Send</span>
+              <span class="badge" id="selected-count-badge">0 files</span>
+            </div>
+            <label class="dropzone" for="file-input" id="dropzone">
+              <input type="file" id="file-input" multiple hidden />
+              <div class="dropzone-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <div class="dropzone-title">Click to choose files or drag &amp; drop here</div>
+              <div class="dropzone-sub">Packed as POSIX 070707 Gzip CPIO archive stream</div>
+            </label>
+            <div id="selected-files-list" class="selected-files-list"></div>
+          </div>
+
+          <!-- Nearby Devices Card -->
+          <div class="card">
+            <div class="card-header">
+              <span>2. Nearby Devices &amp; Direct IP</span>
+              <div class="header-actions">
+                <button class="btn btn-sm btn-secondary" id="btn-scan-refresh">Scan Subnet &amp; Pulse</button>
+              </div>
+            </div>
+
+            <!-- Always-Visible Direct IP Connect Bar -->
+            <div class="add-peer-bar" id="add-peer-form">
+              <input type="text" id="peer-ip-input" placeholder="Direct IPv4 or fe80:: IPv6 (e.g. 192.168.1.45)" />
+              <input type="text" id="peer-name-input" placeholder="Label (optional, auto-detected via /Discover)" />
+              <button class="btn btn-primary btn-sm" id="btn-confirm-add-peer">Connect IP</button>
+            </div>
+
+            <div id="peers-grid" class="peers-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: P2P & AWDL / WI-FI AWARE STACK -->
+      <section class="tab-panel" id="tab-radio">
+        <div class="section-header">
+          <h2>Low-Level Wireless Transport &amp; Frame Inspector</h2>
+          <p class="muted">Real-time status of AWDL 802.11 Action Frames, Wi-Fi Aware (NAN 4.0), BLE Continuity, and IPv6 Link-Local</p>
+        </div>
+
+        <div class="transports-grid" id="transports-grid"></div>
+
+        <div class="card packet-inspector-card">
+          <div class="card-header">
+            <span>Live Protocol Wire Inspector (BLE 0x4c00 / AWDL 00:17:f2 / NAN 50:6f:9a / mDNS)</span>
+            <span class="badge badge-accent" id="ble-frame-badge">BLE: ...</span>
+          </div>
+          <div class="packet-table-wrap">
+            <table class="packet-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Layer</th>
+                  <th>Dir</th>
+                  <th>Summary</th>
+                  <th>Frame Payload (Hex / Info)</th>
+                </tr>
+              </thead>
+              <tbody id="packet-log-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: SETTINGS -->
+      <section class="tab-panel" id="tab-settings">
+        <div class="card settings-card">
+          <div class="card-header">
+            <span>Node Identity &amp; Receiver Configuration</span>
+          </div>
+          <div class="form-row">
+            <label>Computer Display Name (shown on iOS &amp; macOS AirDrop sheet)</label>
+            <input type="text" id="settings-computer-name" />
+          </div>
+          <div class="form-row">
+            <label>Downloads Folder</label>
+            <input type="text" id="settings-download-dir" readonly />
+          </div>
+          <div class="form-row">
+            <button class="btn btn-primary" id="btn-save-settings">Save Settings</button>
+          </div>
+        </div>
+
+        <div class="card settings-card">
+          <div class="card-header">
+            <span>Debugging &amp; Direct IP / macOS Notes</span>
+          </div>
+          <div class="tips-content">
+            <p><strong>1. Direct IP Mode:</strong> On the <strong>Send</strong> tab, enter your other device's Local IP (shown in the top badge on Receive) and click <strong>Connect IP</strong>. HackDrop immediately performs a TLS <code>POST /Discover</code> handshake on port <code>8770</code> (or <code>8771</code>).</p>
+            <p><strong>2. Running on macOS:</strong> Use <code>./hackdrop-darwin-arm64</code> (Apple Silicon M1–M4) or <code>./hackdrop-darwin-amd64</code> (Intel Mac/Hackintosh). If macOS <code>sharingd</code> is holding port 8770, HackDrop automatically binds port <code>8771</code>.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Incoming AirDrop /Ask Modal -->
+  <div class="modal-backdrop hidden" id="ask-modal">
+    <div class="modal-card">
+      <div class="modal-icon">
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#c084fc" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </div>
+      <div class="modal-title">Incoming HackDrop Transfer</div>
+      <div class="modal-desc" id="ask-modal-desc">
+        <strong>Peer</strong> would like to share a file.
+      </div>
+      <div class="modal-files" id="ask-modal-files"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-decline-ask">Decline</button>
+        <button class="btn btn-primary" id="btn-accept-ask">Accept &amp; Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
