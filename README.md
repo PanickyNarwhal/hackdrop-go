@@ -1,4 +1,5 @@
-# HackDrop Go
+![Project Logo](assets/logo.svg)
+
 Reverse engineered AirDrop for Windows and Linux
 
 Bare with me, this is a slight mess of a README and I will clean it up and polish it when I get a chance. 
