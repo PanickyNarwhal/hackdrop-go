@@ -1,4 +1,4 @@
-<img src="assets/hackdrop-logo.svg" width="50%" alt="Logo">
+<img src="assets/HackDrop.png" width="40%" alt="Logo">
 
 Reverse engineered AirDrop for Windows and Linux
 
