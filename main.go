@@ -48,6 +48,7 @@ func main() {
 	fmt.Printf("  Local IP  : %s:%d (IPv6 %s)\n", state.LocalIPv4, state.HTTPSPort, state.LocalIPv6)
 	fmt.Printf("  Downloads : %s\n", state.DownloadDir)
 	fmt.Printf("  BLE Frame : %s\n", state.BLEFrameHex)
+	fmt.Printf("  Version   : 0.2.1-alpha\n")
 	fmt.Printf("============================================================\n")
 
 	if !*headless {
@@ -195,6 +196,7 @@ func startDesktopUIServer(ctx context.Context, app *App, preferredPort int) (str
 	return fmt.Sprintf("http://%s", ln.Addr().String()), nil
 }
 
+// launches the UI in an app window
 func launchNativeAppWindow(url string) {
 	switch runtime.GOOS {
 	case "windows":
@@ -204,7 +206,7 @@ func launchNativeAppWindow(url string) {
 		}
 		for _, p := range edgePaths {
 			if _, err := os.Stat(p); err == nil {
-				cmd := exec.Command(p, "--app="+url, "--window-size=1120,760")
+				cmd := exec.Command(p, "--app="+url, "--window-size=1060,720")
 				_ = cmd.Start()
 				return
 			}
@@ -213,7 +215,7 @@ func launchNativeAppWindow(url string) {
 	case "darwin":
 		chromeApp := "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 		if _, err := os.Stat(chromeApp); err == nil {
-			_ = exec.Command(chromeApp, "--app="+url, "--window-size=1120,760").Start()
+			_ = exec.Command(chromeApp, "--app="+url, "--window-size=1060,720").Start()
 			return
 		}
 		_ = exec.Command("open", url).Start()

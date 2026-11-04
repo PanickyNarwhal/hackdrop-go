@@ -12,7 +12,7 @@
   "info": {
     "companyName": "HackDrop Open Source",
     "productName": "HackDrop",
-    "productVersion": "0.1.0",
+    "productVersion": "0.2.1-alpha",
     "copyright": "MIT",
     "comments": "FOSS AWDL + Wi-Fi Aware + IPv6 AirDrop Bridge"
   }

@@ -138,6 +138,18 @@ func NewCoordinator() (*Coordinator, error) {
 			c.recordPacket("AirDrop HTTPS", "RX",
 				fmt.Sprintf("AirDrop /%s event from %s", ev.Type, ev.PeerName),
 				ev.TransferID)
+			if ev.Type == "discover" {
+				if remoteIP, _, err := net.SplitHostPort(ev.PeerName); err == nil && remoteIP != "" && remoteIP != "127.0.0.1" && remoteIP != "::1" {
+					go func(ip, nameHint string) {
+						for _, existing := range c.mdnsEngine.Peers() {
+							if existing.IPv4Addr == ip || existing.IPv6Addr == ip {
+								return
+							}
+						}
+						c.AddManualPeer(nameHint, "", ip, airdrop.DefaultAirDropPort)
+					}(remoteIP, ev.TransferID)
+				}
+			}
 		},
 	)
 	if err != nil {
@@ -384,7 +396,7 @@ func (c *Coordinator) UpdateSettings(computerName, visibilityMode string, autoAc
 	}
 	c.autoAccept = autoAccept
 	c.mu.Unlock()
-	c.airdropServer.SetAutoAccept(autoAccept)
+	c.airdropServer.SetConfig(c.computerName, c.visibilityMode != "Off", autoAccept)
 }
 
 func (c *Coordinator) State() SystemState {

@@ -1,77 +1,184 @@
-let currentState = null;
+let currentState = {
+  computerName: 'HackDrop-PC',
+  visibilityMode: 'Everyone',
+  autoAccept: false
+};
 let selectedFiles = [];
 let activePromptId = null;
+let isSavingSettings = false;
 
-// Tab switching
+// Sidebar tab navigation
+const tabTitles = {
+  airdrop: 'AirDrop',
+  transfers: 'Transfers',
+  settings: 'Settings'
+};
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    const tabId = 'tab-' + btn.dataset.tab;
-    document.getElementById(tabId).classList.add('active');
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === `tab-${tab}`));
+    document.getElementById('page-title').textContent = tabTitles[tab] || 'AirDrop';
   });
 });
 
-// Visibility selector (Everyone / Off)
-document.querySelectorAll('#visibility-segmented .seg-btn').forEach(btn => {
+// Toggle Direct IP input bar
+document.getElementById('btn-toggle-direct-ip').addEventListener('click', () => {
+  const bar = document.getElementById('direct-ip-bar');
+  bar.classList.toggle('hidden');
+  if (!bar.classList.contains('hidden')) {
+    document.getElementById('peer-ip-input').focus();
+  }
+});
+
+// Toggle Diagnostics in Settings
+document.getElementById('btn-toggle-diagnostics').addEventListener('click', (e) => {
+  const panel = document.getElementById('diagnostics-panel');
+  const hidden = panel.classList.toggle('hidden');
+  e.currentTarget.textContent = hidden
+    ? 'Show Network & Radio Diagnostics'
+    : 'Hide Network & Radio Diagnostics';
+});
+
+// Everyone / Off Segmented Controls (works on both Radar card and Settings tab)
+document.querySelectorAll('[data-vis-group] .seg-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
-    const vis = btn.dataset.vis;
+    const vis = btn.getAttribute('data-vis');
+    currentState.visibilityMode = vis;
+    applyVisibilityUI(vis);
+    showToast(vis === 'Off' ? 'AirDrop receiving turned Off' : 'Discoverable to Everyone');
+
     await updateSettings({
-      computerName: currentState?.computerName || '',
+      computerName: currentState.computerName || '',
       visibilityMode: vis,
-      autoAccept: currentState?.autoAccept || false
+      autoAccept: !!currentState.autoAccept
     });
-    showToast(`Visibility set to "${vis}"`);
   });
 });
 
-// Auto-Accept toggle
+function applyVisibilityUI(vis) {
+  const isOff = vis === 'Off';
+
+  // Highlight active button in all Everyone/Off segmented groups
+  document.querySelectorAll('[data-vis-group] .seg-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-vis') === vis);
+  });
+
+  // Update radar rings & status dot
+  const radarVisual = document.getElementById('radar-visual');
+  if (radarVisual) {
+    radarVisual.classList.toggle('off', isOff);
+  }
+
+  const radarDot = document.getElementById('radar-status-dot');
+  if (radarDot) {
+    radarDot.classList.toggle('green', !isOff);
+  }
+
+  const radarText = document.getElementById('radar-status-text');
+  if (radarText) {
+    radarText.textContent = isOff ? 'Receiving Off' : 'Discoverable to Everyone';
+  }
+
+  // Sidebar HTTPS dot stays green while server is running, or dims if Off
+  const httpsDot = document.getElementById('https-status-dot');
+  if (httpsDot) {
+    httpsDot.classList.toggle('green', !isOff);
+  }
+}
+
+// Auto-Accept switch
 document.getElementById('auto-accept-btn').addEventListener('click', async () => {
-  const nextVal = !(currentState?.autoAccept);
+  const nextVal = !currentState.autoAccept;
+  currentState.autoAccept = nextVal;
+  const autoBtn = document.getElementById('auto-accept-btn');
+  autoBtn.classList.toggle('active', nextVal);
+  autoBtn.setAttribute('aria-checked', String(nextVal));
+
+  showToast(nextVal ? 'Auto-Accept enabled' : 'Auto-Accept disabled');
   await updateSettings({
-    computerName: currentState?.computerName || '',
-    visibilityMode: currentState?.visibilityMode || 'Everyone',
+    computerName: currentState.computerName || '',
+    visibilityMode: currentState.visibilityMode || 'Everyone',
     autoAccept: nextVal
   });
-  showToast(nextVal ? 'Quick Save (Auto-Accept) Enabled' : 'Quick Save Disabled (Ask Every Time)');
 });
 
-// BLE Pulse & Subnet Scan buttons
-document.getElementById('btn-ble-pulse').addEventListener('click', triggerBLEPulse);
-document.getElementById('btn-subnet-scan').addEventListener('click', triggerSubnetScan);
-document.getElementById('btn-scan-refresh').addEventListener('click', triggerSubnetScan);
+// Save Device Name in Settings
+document.getElementById('btn-save-settings').addEventListener('click', async () => {
+  const name = document.getElementById('settings-computer-name').value.trim();
+  if (!name) return;
+  currentState.computerName = name;
+  await updateSettings({
+    computerName: name,
+    visibilityMode: currentState.visibilityMode || 'Everyone',
+    autoAccept: !!currentState.autoAccept
+  });
+  showToast('Saved device name');
+});
 
-async function triggerBLEPulse() {
-  const res = await fetch('/api/wakeup', { method: 'POST' });
-  const data = await res.json();
-  showToast(`Broadcasted BLE 0x4c00 Frame (${data.bleFrameHex.slice(0, 16)}...)`);
-  await fetchState();
+async function updateSettings(payload) {
+  isSavingSettings = true;
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      currentState = await res.json();
+      renderState(currentState);
+    }
+  } finally {
+    isSavingSettings = false;
+  }
 }
 
-async function triggerSubnetScan() {
-  showToast('Scanning local Wi-Fi subnet on ports 8770 & 8771...');
+// Wake Nearby (BLE) & Scan Network
+document.getElementById('btn-ble-pulse').addEventListener('click', async () => {
+  const res = await fetch('/api/wakeup', { method: 'POST' });
+  await res.json();
+  showToast('Sent BLE wakeup broadcast');
+  await fetchState();
+});
+
+document.getElementById('btn-subnet-scan').addEventListener('click', async () => {
+  showToast('Scanning local network for AirDrop devices...');
   const res = await fetch('/api/scan-subnet', { method: 'POST' });
   const data = await res.json();
-  showToast(`Subnet scan finished (${data.found || 0} active host(s) responded to /Discover)`);
+  showToast(`Network scan complete (${data.found || 0} found)`);
   await fetchState();
-}
+});
 
-// File input handling
+// File Selection & Drag-and-Drop
 const fileInput = document.getElementById('file-input');
+const dropzone = document.getElementById('dropzone');
+
 fileInput.addEventListener('change', (e) => {
   selectedFiles = Array.from(e.target.files);
   renderSelectedFiles();
 });
 
+dropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+});
+
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+    selectedFiles = Array.from(e.dataTransfer.files);
+    renderSelectedFiles();
+  }
+});
+
 function renderSelectedFiles() {
   const badge = document.getElementById('selected-count-badge');
   const list = document.getElementById('selected-files-list');
-  badge.textContent = `${selectedFiles.length} file(s)`;
+  badge.textContent = selectedFiles.length ? `${selectedFiles.length} file(s) ready` : 'No files selected';
   list.innerHTML = selectedFiles.map(f => `
     <div class="file-chip">
       <span>${escapeHTML(f.name)}</span>
-      <span class="muted">${(f.size / 1024).toFixed(1)} KB</span>
+      <span class="mono-text muted-text">${(f.size / 1024).toFixed(1)} KB</span>
     </div>
   `).join('');
 }
@@ -81,24 +188,25 @@ document.getElementById('btn-confirm-add-peer').addEventListener('click', async 
   const ipAddr = document.getElementById('peer-ip-input').value.trim();
   const displayName = document.getElementById('peer-name-input').value.trim();
   if (!ipAddr) {
-    showToast('Enter an IPv4 or fe80:: IPv6 address first');
+    showToast('Enter a device IP address first');
     return;
   }
-  showToast(`Probing https://${ipAddr}:8770/Discover ...`);
+  showToast(`Connecting to ${ipAddr}...`);
   const res = await fetch('/api/peer/add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ displayName, modelName: '', ipAddr, port: 8770 })
   });
   const peer = await res.json();
+  document.getElementById('direct-ip-bar').classList.add('hidden');
   showToast(`Added ${peer.displayName} (${ipAddr}:${peer.port})`);
   await fetchState();
 });
 
-// Send files to peer
+// Send Files to Peer
 async function sendToPeer(peerId, peerName) {
   if (selectedFiles.length === 0) {
-    showToast('Select at least one file in Step 1 first');
+    showToast('Select or drop files in the Send Files box first');
     return;
   }
   showToast(`Sending ${selectedFiles.length} file(s) to ${peerName}...`);
@@ -111,15 +219,15 @@ async function sendToPeer(peerId, peerName) {
     body: formData
   });
   if (res.ok) {
-    showToast(`Transfer to ${peerName} completed`);
+    showToast(`Delivered to ${peerName}`);
   } else {
     const errText = await res.text();
-    showToast(`Transfer failed: ${errText}`);
+    showToast(`Failed: ${errText}`);
   }
   await fetchState();
 }
 
-// Incoming /Ask Modal Accept / Decline
+// Incoming /Ask Modal
 document.getElementById('btn-accept-ask').addEventListener('click', () => respondAsk(true));
 document.getElementById('btn-decline-ask').addEventListener('click', () => respondAsk(false));
 
@@ -133,32 +241,12 @@ async function respondAsk(accept) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ transferId: id, accept })
   });
-  showToast(accept ? 'Accepted incoming transfer — extracting CPIO stream...' : 'Declined transfer request');
-  setTimeout(fetchState, 500);
-}
-
-// Save settings
-document.getElementById('btn-save-settings').addEventListener('click', async () => {
-  const name = document.getElementById('settings-computer-name').value.trim();
-  await updateSettings({
-    computerName: name,
-    visibilityMode: currentState?.visibilityMode || 'Everyone',
-    autoAccept: currentState?.autoAccept || false
-  });
-  showToast('Saved node settings');
-});
-
-async function updateSettings(payload) {
-  const res = await fetch('/api/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  currentState = await res.json();
-  renderState(currentState);
+  showToast(accept ? 'Accepted transfer' : 'Declined transfer');
+  setTimeout(fetchState, 400);
 }
 
 async function fetchState() {
+  if (isSavingSettings) return;
   try {
     const res = await fetch('/api/state');
     currentState = await res.json();
@@ -169,124 +257,120 @@ async function fetchState() {
 }
 
 function renderState(st) {
-  document.getElementById('sidebar-os').textContent = st.os;
-  document.getElementById('sidebar-port').textContent = `HTTPS :${st.httpsPort} Active`;
-  document.getElementById('sidebar-device-id').textContent = `ID: ${st.deviceId}`;
+  const isOff = st.visibilityMode === 'Off';
+  document.getElementById('sidebar-port').textContent = isOff
+    ? `HTTPS :${st.httpsPort} (Off)`
+    : `HTTPS :${st.httpsPort} Active`;
+  document.getElementById('sidebar-ip').textContent = st.localIpv4 || '127.0.0.1';
 
   document.getElementById('receive-node-name').textContent = st.computerName;
-  document.getElementById('receive-model-badge').textContent = st.modelName;
-  document.getElementById('receive-ip-badge').textContent = `${st.localIpv4 || '127.0.0.1'}:${st.httpsPort}`;
-  document.getElementById('receive-id-badge').textContent = `#${st.deviceId}`;
+  document.getElementById('receive-ip-badge').textContent = `${st.localIpv4 || '127.0.0.1'}:${st.httpsPort} · ${st.modelName}`;
 
-  const maskedDir = (st.downloadDir || '').replace(/([\\/])Users\1[^\\/]+/gi, '$1Users$1BlackMesa');
-  document.getElementById('download-dir-label').textContent = maskedDir;
-  document.getElementById('ble-frame-badge').textContent = `BLE 0x4c00: ${st.bleFrameHex}`;
+  document.getElementById('transfers-download-dir').textContent = st.downloadDir || '';
+  document.getElementById('settings-download-dir').textContent = st.downloadDir || '';
 
   const settingsNameInput = document.getElementById('settings-computer-name');
   if (document.activeElement !== settingsNameInput) {
-    settingsNameInput.value = st.computerName;
+    settingsNameInput.value = st.computerName || '';
   }
-  document.getElementById('settings-download-dir').value = maskedDir;
 
-  // Visibility segmented buttons
-  document.querySelectorAll('#visibility-segmented .seg-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.vis === st.visibilityMode);
-  });
+  applyVisibilityUI(st.visibilityMode || 'Everyone');
 
-  // Auto-accept button
   const autoBtn = document.getElementById('auto-accept-btn');
-  autoBtn.classList.toggle('active', st.autoAccept);
-  autoBtn.textContent = st.autoAccept ? 'On (Auto-Save to Downloads)' : 'Off (Ask Every Time)';
+  autoBtn.classList.toggle('active', !!st.autoAccept);
+  autoBtn.setAttribute('aria-checked', String(!!st.autoAccept));
 
-  // Check for pending /Ask prompt
+  // Pending /Ask prompt
   const pendingEvent = (st.recentEvents || []).find(ev => ev.type === 'ask' && ev.prompt && ev.prompt.status === 'pending');
   if (pendingEvent && activePromptId !== pendingEvent.transferId) {
     activePromptId = pendingEvent.transferId;
     const p = pendingEvent.prompt;
     document.getElementById('ask-modal-desc').innerHTML =
-      `<strong>${escapeHTML(p.senderComputerName)}</strong> (${escapeHTML(p.senderModelName)}) wants to send ${p.files.length} file(s):`;
+      `<strong>${escapeHTML(p.senderComputerName)}</strong> would like to share ${p.files.length} file(s).`;
     document.getElementById('ask-modal-files').innerHTML = p.files.map(f =>
-      `<div><strong>${escapeHTML(f.fileName)}</strong> <span class="muted">(${escapeHTML(f.fileType)})</span></div>`
+      `<div>${escapeHTML(f.fileName)}</div>`
     ).join('');
     document.getElementById('ask-modal').classList.remove('hidden');
   }
 
-  // Render recent transfer events
-  const evList = document.getElementById('events-list');
-  if (st.recentEvents && st.recentEvents.length > 0) {
-    evList.innerHTML = st.recentEvents.map(ev => {
-      if (ev.type === 'complete') {
-        const files = (ev.savedFiles || []).join(', ').replace(/([\\/])Users\1[^\\/]+/gi, '$1Users$1BlackMesa');
-        return `<div class="event-row">
-          <span><span class="event-tag">SAVED</span><strong>Transfer Complete</strong> (${escapeHTML(ev.peerName)}) — <code>${escapeHTML(files)}</code></span>
-          <span class="muted">${new Date(ev.timestamp).toLocaleTimeString()}</span>
-        </div>`;
-      }
-      if (ev.type === 'discover') {
-        return `<div class="event-row">
-          <span><span class="event-tag">DISCOVER</span><strong>/Discover Handshake</strong> from ${escapeHTML(ev.peerName)}</span>
-          <span class="muted">${new Date(ev.timestamp).toLocaleTimeString()}</span>
-        </div>`;
-      }
-      if (ev.type === 'ask') {
-        return `<div class="event-row">
-          <span><span class="event-tag">ASK</span><strong>/Ask Prompt</strong> from ${escapeHTML(ev.peerName)}</span>
-          <span class="muted">${new Date(ev.timestamp).toLocaleTimeString()}</span>
-        </div>`;
-      }
-      return `<div class="event-row">
-        <span><span class="event-tag">${escapeHTML(ev.type)}</span>Peer ${escapeHTML(ev.peerName)}</span>
-        <span class="muted">${new Date(ev.timestamp).toLocaleTimeString()}</span>
-      </div>`;
+  // Render Nearby Devices
+  const peers = st.discoveredPeers || [];
+  document.getElementById('peers-count-label').textContent = `${peers.length} found`;
+  const peersGrid = document.getElementById('peers-grid');
+
+  if (peers.length === 0) {
+    peersGrid.innerHTML = `<div class="card empty-state" style="grid-column: 1 / -1;">No nearby devices found yet. Click Scan Network or Add IP above.</div>`;
+  } else {
+    peersGrid.innerHTML = peers.map(p => {
+      const initial = (p.displayName || 'D').trim().charAt(0).toUpperCase();
+      return `
+        <div class="peer-card">
+          <div class="peer-card-left">
+            <div class="peer-avatar">${escapeHTML(initial)}</div>
+            <div style="min-width:0;">
+              <div class="peer-name">${escapeHTML(p.displayName)}</div>
+              <div class="peer-meta">${escapeHTML(p.ipv4Addr || p.ipv6Addr)}:${p.port}</div>
+            </div>
+          </div>
+          <button type="button" class="mac-btn mac-btn-primary" onclick="sendToPeer('${escapeHTML(p.instanceId)}', '${escapeHTML(p.displayName)}')">
+            Send
+          </button>
+        </div>
+      `;
     }).join('');
   }
 
-  // Render peers grid
-  const peersGrid = document.getElementById('peers-grid');
-  const peers = st.discoveredPeers || [];
-  if (peers.length === 0) {
-    peersGrid.innerHTML = `<div class="empty-hint">No peers listed yet. Type your MacBook or PC IP above and click <strong>Connect IP</strong>, or click <strong>Scan Subnet &amp; Pulse</strong>.</div>`;
-  } else {
-    peersGrid.innerHTML = peers.map(p => `
-      <div class="peer-card">
-        <div class="peer-top">
-          <div class="peer-avatar">NODE</div>
-          <div>
-            <div class="peer-title">${escapeHTML(p.displayName)}</div>
-            <div class="peer-meta">${escapeHTML(p.modelName)} • ${escapeHTML(p.ipv4Addr || p.ipv6Addr)}:${p.port}</div>
+  // Render Transfers
+  const evList = document.getElementById('events-list');
+  if (st.recentEvents && st.recentEvents.length > 0) {
+    evList.innerHTML = st.recentEvents.map(ev => {
+      const timeStr = new Date(ev.timestamp).toLocaleTimeString();
+      if (ev.type === 'complete') {
+        const files = (ev.savedFiles || []).join(', ');
+        return `
+          <div class="mac-row">
+            <div>
+              <div class="row-title">${escapeHTML(ev.peerName)}</div>
+              <div class="row-sub mono-text">${escapeHTML(files)}</div>
+            </div>
+            <span class="mono-text muted-text">${timeStr}</span>
           </div>
+        `;
+      }
+      return `
+        <div class="mac-row">
+          <div>
+            <div class="row-title">${escapeHTML(ev.peerName)}</div>
+            <div class="row-sub">${escapeHTML(ev.type.toUpperCase())}</div>
+          </div>
+          <span class="mono-text muted-text">${timeStr}</span>
         </div>
-        <div class="badge badge-accent">${escapeHTML(p.transport)}</div>
-        <button class="btn btn-primary btn-sm" onclick="sendToPeer('${escapeHTML(p.instanceId)}', '${escapeHTML(p.displayName)}')">
-          Send Selected Files
-        </button>
+      `;
+    }).join('');
+  }
+
+  // Render Diagnostics (Transports + Packet Log)
+  const tGrid = document.getElementById('transports-grid');
+  if (tGrid) {
+    tGrid.innerHTML = (st.transports || []).map(t => `
+      <div class="transport-card">
+        <div class="transport-title">${escapeHTML(t.mode)}</div>
+        <div class="transport-kv">${escapeHTML(t.interfaceName)}</div>
       </div>
     `).join('');
   }
 
-  // Render P2P Transports
-  const tGrid = document.getElementById('transports-grid');
-  tGrid.innerHTML = (st.transports || []).map(t => `
-    <div class="transport-card">
-      <div class="transport-title">${escapeHTML(t.mode)}</div>
-      <div class="transport-kv">Backend: ${escapeHTML(t.driverBackend)}</div>
-      <div class="transport-kv">Interface: ${escapeHTML(t.interfaceName)} (${escapeHTML(t.ipv6LinkLocal)})</div>
-      ${t.currentChannel ? `<div class="transport-kv">Social Channel: Ch ${t.currentChannel}</div>` : ''}
-      <div class="transport-detail">${escapeHTML(t.detail)}</div>
-    </div>
-  `).join('');
-
-  // Render Packet Inspector
   const pktBody = document.getElementById('packet-log-body');
-  pktBody.innerHTML = (st.recentPackets || []).map(pkt => `
-    <tr>
-      <td>${escapeHTML(pkt.timestamp)}</td>
-      <td><span class="badge">${escapeHTML(pkt.layer)}</span></td>
-      <td><strong>${escapeHTML(pkt.direction)}</strong></td>
-      <td>${escapeHTML(pkt.summary)}</td>
-      <td class="hex-cell">${escapeHTML(pkt.hexBytes)}</td>
-    </tr>
-  `).join('');
+  if (pktBody) {
+    pktBody.innerHTML = (st.recentPackets || []).slice(0, 20).map(pkt => `
+      <tr>
+        <td class="mono-text">${escapeHTML(pkt.timestamp)}</td>
+        <td>${escapeHTML(pkt.layer)}</td>
+        <td class="mono-text">${escapeHTML(pkt.direction)}</td>
+        <td>${escapeHTML(pkt.summary)}</td>
+      </tr>
+    `).join('');
+  }
 }
 
 function showToast(msg) {
@@ -294,7 +378,7 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.remove('hidden');
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => t.classList.add('hidden'), 3200);
+  window.__toastTimer = setTimeout(() => t.classList.add('hidden'), 2800);
 }
 
 function escapeHTML(str) {

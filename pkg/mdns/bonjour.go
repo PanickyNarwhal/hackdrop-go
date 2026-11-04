@@ -379,7 +379,8 @@ func (e *Engine) handlePacket(pkt []byte, src *net.UDPAddr, iface *net.Interface
 	}
 
 	rawLower := strings.ToLower(string(pkt))
-	if !strings.Contains(rawLower, "_airdrop") && !strings.Contains(rawLower, "_companion-link") {
+	hostLower := strings.ToLower(sanitizeHost(e.computerName))
+	if !strings.Contains(rawLower, "_airdrop") && !strings.Contains(rawLower, "_companion-link") && !strings.Contains(rawLower, hostLower) {
 		return
 	}
 
@@ -388,6 +389,9 @@ func (e *Engine) handlePacket(pkt []byte, src *net.UDPAddr, iface *net.Interface
 
 	if !isResponse {
 		_ = e.sendAirDropAnnouncement(conn, mcast, ipv6LL, ipv4)
+		if src != nil {
+			_ = e.sendAirDropAnnouncement(conn, src, ipv6LL, ipv4)
+		}
 		return
 	}
 

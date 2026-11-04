@@ -65,6 +65,7 @@ type Server struct {
 	port            int
 	downloadDir     string
 	autoAccept      bool
+	visible         bool
 	tlsConfig       *tls.Config
 	httpServer      *http.Server
 	pendingAsks     map[string]chan bool
@@ -91,6 +92,7 @@ func NewServer(deviceID, computerName, modelName, downloadDir string, port int, 
 		port:            port,
 		downloadDir:     downloadDir,
 		autoAccept:      false,
+		visible:         true,
 		tlsConfig:       tlsCfg,
 		pendingAsks:     make(map[string]chan bool),
 		approvedSenders: make(map[string]time.Time),
@@ -155,7 +157,10 @@ func (s *Server) ProbePeer(ctx context.Context, targetHost string, preferredPort
 		Timeout: 2500 * time.Millisecond,
 	}
 
-	discoverBody := buildDiscoverRequestBinaryPlist()
+	s.mu.Lock()
+	cName := s.computerName
+	s.mu.Unlock()
+	discoverBody := buildDiscoverRequestBinaryPlist(cName, s.modelName, s.deviceID)
 	for _, p := range ports {
 		hostPort := fmt.Sprintf("%s:%d", targetHost, p)
 		if strings.Contains(targetHost, ":") && !strings.HasPrefix(targetHost, "[") {
@@ -183,6 +188,17 @@ func (s *Server) ProbePeer(ctx context.Context, targetHost string, preferredPort
 	return "", "", preferredPort, fmt.Errorf("no AirDrop HTTPS listener responded at %s (ports 8770/8771)", targetHost)
 }
 
+// updates the devices name, state, and auto accept on the server
+func (s *Server) SetConfig(computerName string, visible bool, autoAccept bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if computerName != "" {
+		s.computerName = computerName
+	}
+	s.visible = visible
+	s.autoAccept = autoAccept
+}
+
 func (s *Server) SetAutoAccept(auto bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -207,19 +223,38 @@ func (s *Server) RespondToAsk(transferID string, accept bool) bool {
 // handleDiscover responds to Apple's `POST /Discover` request with a `bplist00` binary plist
 // containing ReceiverComputerName, ReceiverModelName, and ReceiverMediaCapabilities.
 func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
-	_, _ = io.ReadAll(r.Body)
+	reqBody, _ := io.ReadAll(r.Body)
+	senderName, _ := parseDiscoverRequestPayload(reqBody)
 	defer r.Body.Close()
 
-	mediaCaps := map[string]int{"Version": 1}
+	mediaCaps := map[string]any{
+		"Version": 1,
+		"Vendor": map[string]any{
+			"com.apple": map[string]any{
+				"LivePhotoFormatVersion":   "1",
+				"AssetBundleFormatVersion": "1",
+			},
+		},
+	}
 	mediaCapsBytes, _ := json.Marshal(mediaCaps)
 
-	respBytes := buildReceiverBinaryPlist(s.computerName, s.modelName, s.deviceID, mediaCapsBytes)
+	s.mu.Lock()
+	vis := s.visible
+	cName := s.computerName
+	s.mu.Unlock()
+	if !vis {
+		http.Error(w, "AirDrop Receiving Off", http.StatusForbidden)
+		return
+	}
+
+	respBytes := buildReceiverBinaryPlist(cName, s.modelName, s.deviceID, mediaCapsBytes)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(respBytes)
 
 	s.emit(TransferEvent{
-		Type:      "discover",
+		Type:       "discover",
+		TransferID: senderName,
 		PeerName:  r.RemoteAddr,
 		Timestamp: time.Now(),
 	})
@@ -245,7 +280,13 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
+	vis := s.visible
 	auto := s.autoAccept
+	if !vis {
+		s.mu.Unlock()
+		http.Error(w, "AirDrop Receiving Off", http.StatusForbidden)
+		return
+	}
 	decisionCh := make(chan bool, 1)
 	if !auto {
 		s.pendingAsks[transferID] = decisionCh
@@ -296,7 +337,13 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	remoteHost := extractRemoteIP(r.RemoteAddr)
 	s.mu.Lock()
 	expiry, approved := s.approvedSenders[remoteHost]
+	vis := s.visible
 	auto := s.autoAccept
+	if !vis {
+		s.mu.Unlock()
+		http.Error(w, "AirDrop Receiving Off", http.StatusForbidden)
+		return
+	}
 	if approved && time.Now().Before(expiry) {
 		delete(s.approvedSenders, remoteHost)
 	} else {
@@ -366,7 +413,10 @@ func (s *Server) SendFiles(ctx context.Context, targetHost string, targetPort in
 	}
 
 	// Step 1: POST /Discover (bplist00)
-	discoverBody := buildDiscoverRequestBinaryPlist()
+	s.mu.Lock()
+	cName := s.computerName
+	s.mu.Unlock()
+	discoverBody := buildDiscoverRequestBinaryPlist(cName, s.modelName, s.deviceID)
 	reqDisc, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/Discover", bytes.NewReader(discoverBody))
 	if err != nil {
 		return err
