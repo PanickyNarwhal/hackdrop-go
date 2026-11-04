@@ -42,6 +42,7 @@ A. Grab your binary from releases
   * Linux (amd64): hackdrop-linux-amd64
   * macOS Apple Silicon (arm64): hackdrop-darwin-arm64
   * macOS Intel / Hackintosh (amd64): hackdrop-darwin-amd64
+
 B. If you are going to build it from source, it needs Go 1.22+. If you are going that route, I'm going to assume you already know how to compile something in Go or you are going to have your LLM do it for you. 
 
 ### Quick Note
